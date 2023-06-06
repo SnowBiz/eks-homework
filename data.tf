@@ -14,7 +14,7 @@ data "aws_eks_cluster_auth" "this" {
   name = module.eks.cluster_id
 }
 
-data "aws_ecrpublic_authorization_token" "ecr_token" {}
+data "aws_ecrpublic_authorization_token" "token" {}
 
 # You can have the node group track the latest version of the Amazon EKS optimized Amazon Linux AMI for a given EKS version by querying an Amazon provided SSM parameter. 
 # Replace amazon-linux-2 in the parameter name below with amazon-linux-2-gpu to retrieve the accelerated AMI version and amazon-linux-2-arm64 to retrieve the Arm version.

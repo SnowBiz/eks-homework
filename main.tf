@@ -53,7 +53,7 @@ module "eks" {
   aws_auth_roles = [
     # We need to add in the Karpenter node IAM role for nodes launched by Karpenter
     {
-      rolearn  = module.eks_blueprints_kubernetes_addons.karpenter.node_iam_role_arn
+      rolearn  = module.eks_blueprints_addons.karpenter.node_iam_role_arn
       username = "system:node:{{EC2PrivateDNSName}}"
       groups = [
         "system:bootstrappers",
@@ -92,73 +92,35 @@ module "eks" {
 ######################################
 # Kubernetes Addons                  #
 ######################################
+module "eks_blueprints_addons" {
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints-addons?ref=v0.2.0"
 
-module "eks_blueprints_kubernetes_addons" {
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints?ref=v4.32.1/modules/kubernetes-addons"
-  eks_cluster_id = module.eks.cluster_id
+  cluster_name      = module.eks.cluster_name
+  cluster_endpoint  = module.eks.cluster_endpoint
+  cluster_version   = module.eks.cluster_version
+  oidc_provider_arn = module.eks.oidc_provider_arn
 
-  # Enable VPC CNI
-  enable_amazon_eks_vpc_cni = true
-  amazon_eks_vpc_cni_config = {
-    addon_name               = "vpc-cni"
-    addon_version            = data.aws_eks_addon_version.default["vpc-cni"].version
-    service_account          = "aws-node"
-    resolve_conflicts        = "OVERWRITE"
-    namespace                = "kube-system"
-    additional_iam_policies  = []
-    service_account_role_arn = ""
-    tags                     = {}
-  }
-
-  # Enable CoreDNS - Pin to core nodegroup
-  enable_amazon_eks_coredns                      = true
-  enable_coredns_cluster_proportional_autoscaler = true
-  amazon_eks_coredns_config = {
-    addon_name               = "coredns"
-    addon_version            = data.aws_eks_addon_version.default["coredns"].version
-    service_account          = "coredns"
-    resolve_conflicts_on_create        = "OVERWRITE"
-    namespace                = "kube-system"
-    service_account_role_arn = ""
+  # Enable core addons
+  eks_addons = {
+    coredns = {
+    # Pass in custom configuration for the managed addon, pin our coredns controller to our core nodegroup
     configuration_values = jsonencode({
       nodeSelector = {
         "NodeGroupType" : "core"
       }
     })
-    additional_iam_policies = []
-    tags                    = {}
+    }
+    vpc-cni    = {}
+    kube-proxy = {}
   }
 
-  # Enable KubeProxy
-  enable_amazon_eks_kube_proxy = true
-  amazon_eks_kube_proxy_config = {
-    addon_name               = "kube-proxy"
-    addon_version            = data.aws_eks_addon_version.default["kube-proxy"].version
-    service_account          = "kube-proxy"
-    resolve_conflicts        = "OVERWRITE"
-    namespace                = "kube-system"
-    additional_iam_policies  = []
-    service_account_role_arn = ""
-    tags                     = {}
-  }
-
-  # Karpenter
+  # Enable Karpenter
   enable_karpenter = true
-  karpenter_helm_config = {
-    repository_username = data.aws_ecrpublic_authorization_token.ecr_token.user_name
-    repository_password = data.aws_ecrpublic_authorization_token.ecr_token.password
+  karpenter = {
+    repository_username = data.aws_ecrpublic_authorization_token.token.user_name
+    repository_password = data.aws_ecrpublic_authorization_token.token.password
   }
 
-  karpenter_node_iam_instance_profile        = module.karpenter.instance_profile_name
-  karpenter_enable_spot_termination_handling = true
-  #karpenter_sqs_queue_arn                    = module.karpenter.queue_arn
-}
-
-module "karpenter" {
-  source = "github.com/terraform-aws-modules/terraform-aws-eks?ref=v19.15.2/modules/karpenter"
-
-  cluster_name = var.cluster_name
-  create_irsa  = false # IRSA will be created by the kubernetes-addons module
 }
 
 ################################################################################
