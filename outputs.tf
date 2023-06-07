@@ -1,4 +1,4 @@
 output "configure_kubectl" {
-  description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig, add '--role-arn' to use appplication team role"
+  description = "Configure kubectl"
   value       = "aws eks --region ${var.region} update-kubeconfig --name ${var.cluster_name}"
 }

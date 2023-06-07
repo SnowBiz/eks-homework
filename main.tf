@@ -1,37 +1,46 @@
 ######################################
-# Define Terraform Remote State Info #
-######################################
-terraform {
-  backend "s3" {
-    bucket = "eks-homework-terraform-state"
-    region = "us-east-1"
-    key    = "terraform.tfstate"
-    dynamodb_table = "eks-homework-tf-state"
-  }
-}
-######################################
 # Configure Providers                #
 ######################################
+provider "aws" {
+  region = "us-east-1"
+  alias = "virginia"
+}
+
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.this.token
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    # Requires the awscli to be installed
+    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
 }
 
 provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-    token                  = data.aws_eks_cluster_auth.this.token
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      # Requires the awscli to be installed
+      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
   }
 }
 
 provider "kubectl" {
-  apply_retry_count      = 10
+  apply_retry_count      = 5
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
   load_config_file       = false
-  token                  = data.aws_eks_cluster_auth.this.token
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    # Requires the awscli to be installed
+    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
 }
 
 ######################################
@@ -44,8 +53,6 @@ module "eks" {
   cluster_version                = var.cluster_version
   cluster_endpoint_public_access = true
 
-  #vpc_id     = var.vpc_id
-  #subnet_ids = var.private_subnet_ids
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
@@ -66,11 +73,9 @@ module "eks" {
     mg_5 = {
       node_group_name = "core-node-grp"
       instance_types  = ["m5.xlarge"]
-      #subnet_ids      = var.private_subnet_ids
       subnet_ids      = module.vpc.private_subnets
       version         = var.cluster_version
       ami_type        = "AL2_x86_64"                                                       # Amazon Linux 2(AL2_x86_64), AL2_x86_64_GPU, AL2_ARM_64, BOTTLEROCKET_x86_64, BOTTLEROCKET_ARM_64
-      release_version = nonsensitive(data.aws_ssm_parameter.eks_ami_release_version.value) # Enter AMI release version to deploy the latest AMI released by AWS. Used only when you specify ami_type
 
       # Set Min & Max Size
       desired_size = 3
@@ -123,12 +128,9 @@ module "eks_blueprints_addons" {
 
 }
 
-################################################################################
-# Supporting Resources
-# Note: Normally I would suggest having a separate stack for the base network constructs
-#       Then you would feed this in via the variables in the tfvars. This makes the eks
-#       stack easier to use for spinning up new clusters within the same vpc, if needed.
-################################################################################
+######################################
+# Supporting Resources               #  
+######################################
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
