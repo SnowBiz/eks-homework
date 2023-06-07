@@ -161,3 +161,100 @@ module "vpc" {
     "karpenter.sh/discovery" = var.cluster_name
   }
 }
+
+
+######################################
+# Kubernetes CRD's (Flux / Karpenter)#
+######################################
+# !! << Service Linked Role >>
+# !! If you have never used a spot instance, you must run the following command to create the service linked role.
+# !! aws iam create-service-linked-role --aws-service-name spot.amazonaws.com
+# !! source: https://docs.aws.amazon.com/parallelcluster/latest/ug/spot.html
+# !! << Using this provisioner >>
+# !! This Karpenter provisioner uses the nodeGroupType: "apps" nodeSelector.
+# !! In order to use this, include the nodeSelector on your deployment under Spec -> Template -> Spec in the deployment schema
+resource "kubectl_manifest" "karpenter_provisioner" {
+  yaml_body = <<-YAML
+    apiVersion: karpenter.sh/v1alpha5
+    kind: Provisioner
+    metadata:
+      name: default
+    spec:
+      requirements:
+        - key: "karpenter.k8s.aws/instance-category"
+          operator: In
+          values: ["c", "m", "r"]
+        - key: "karpenter.k8s.aws/instance-cpu"
+          operator: In
+          values: ["4", "8", "16", "32"]
+        - key: "karpenter.k8s.aws/instance-hypervisor"
+          operator: In
+          values: ["nitro"]
+        - key: "topology.kubernetes.io/zone"
+          operator: In
+          values: ${jsonencode(local.azs)}
+        - key: "kubernetes.io/arch"
+          operator: In
+          values: ["amd64"]
+        - key: "karpenter.sh/capacity-type" # If not included, the webhook for the AWS cloud provider will default to on-demand
+          operator: In
+          values: ["spot", "on-demand"]
+      kubeletConfiguration:
+        containerRuntime: containerd
+        maxPods: 110
+      limits:
+        resources:
+          cpu: 1000
+      consolidation:
+        enabled: true
+      providerRef:
+        name: default
+      labels:
+        nodeGroupType: "apps"
+      ttlSecondsUntilExpired: 604800 # 7 Days = 7 * 24 * 60 * 60 Seconds
+  YAML
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+resource "kubectl_manifest" "karpenter_node_template" {
+  yaml_body = <<-YAML
+    apiVersion: karpenter.k8s.aws/v1alpha1
+    kind: AWSNodeTemplate
+    metadata:
+      name: default
+    spec:
+      subnetSelector:
+        karpenter.sh/discovery: ${var.cluster_name}
+      securityGroupSelector:
+        karpenter.sh/discovery: ${var.cluster_name}
+      instanceProfile: ${module.eks_blueprints_addons.karpenter.node_instance_profile_name}
+      tags:
+        karpenter.sh/discovery: ${var.cluster_name}
+  YAML
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+resource "kubectl_manifest" "flux_git_repository" {
+  yaml_body = <<-YAML
+    apiVersion: source.toolkit.fluxcd.io/v1
+    kind: GitRepository
+    metadata:
+      name: podinfo
+      namespace: default
+    spec:
+      interval: 5m0s
+      url: https://github.com/stefanprodan/podinfo
+      ref:
+        branch: master
+  YAML
+
+  depends_on = [
+    helm_release.flux
+  ]
+}
