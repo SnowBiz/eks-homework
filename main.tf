@@ -130,6 +130,13 @@ resource "helm_release" "flux" {
   name             = "flux2"
   namespace        = "flux-system"
   create_namespace = true
+
+  # Need to figure out the correct way to set the gitops repo url. Saving for later.
+  set {
+    name  = "git.url"
+    value = "https://github.com/SnowBiz/flux-gitops.git"
+  }
+
 }
 
 ######################################
