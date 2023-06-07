@@ -1,6 +1,6 @@
-# ----------------------------------------------------
-# VPC / Subnet Variables
-# ----------------------------------------------------
+######################################
+# VPC / Subnet Variables             #
+######################################
 variable "region" {
     description = "AWS Region"
     type = string
@@ -10,9 +10,9 @@ variable "vpc_cidr" {
     type = string
 }
 
-# ----------------------------------------------------
-# EKS Cluster Information
-# ----------------------------------------------------
+######################################
+# EKS Cluster Information            #
+######################################
 variable "cluster_name" {
     description = "Name of EKS Cluster"
     type = string

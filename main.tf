@@ -107,14 +107,7 @@ module "eks_blueprints_addons" {
 
   # Enable core addons
   eks_addons = {
-    coredns = {
-    # Pass in custom configuration for the managed addon, pin our coredns controller to our core nodegroup
-    configuration_values = jsonencode({
-      nodeSelector = {
-        "NodeGroupType" : "core"
-      }
-    })
-    }
+    coredns    = {}
     vpc-cni    = {}
     kube-proxy = {}
   }
@@ -126,6 +119,17 @@ module "eks_blueprints_addons" {
     repository_password = data.aws_ecrpublic_authorization_token.token.password
   }
 
+}
+
+######################################
+# Install Flux                       #  
+######################################
+resource "helm_release" "flux" {
+  repository       = "https://fluxcd-community.github.io/helm-charts"
+  chart            = "flux2"
+  name             = "flux2"
+  namespace        = "flux-system"
+  create_namespace = true
 }
 
 ######################################
