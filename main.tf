@@ -246,12 +246,34 @@ resource "kubectl_manifest" "flux_git_repository" {
     kind: GitRepository
     metadata:
       name: podinfo
-      namespace: default
+      namespace: flux-system
     spec:
       interval: 5m0s
       url: https://github.com/stefanprodan/podinfo
       ref:
         branch: master
+  YAML
+
+  depends_on = [
+    helm_release.flux
+  ]
+}
+
+resource "kubectl_manifest" "flux_git_repository_kustomization" {
+  yaml_body = <<-YAML
+    apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: podinfo
+      namespace: flux-system
+    spec:
+      interval: 5m0s
+      path: ./kustomize
+      prune: true
+      sourceRef:
+        kind: GitRepository
+        name: podinfo
+      targetNamespace: default
   YAML
 
   depends_on = [
