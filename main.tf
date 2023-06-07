@@ -133,8 +133,7 @@ module "eks_blueprints_addons" {
 ######################################
 
 module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  source = "github.com/terraform-aws-modules/terraform-aws-vpc?ref=v5.0.0"
 
   name = var.cluster_name
   cidr = var.vpc_cidr
